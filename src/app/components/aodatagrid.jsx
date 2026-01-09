@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useMemo } from "react";
+import React, { useState, useRef, useMemo, useEffect } from "react";
 import {
     ChevronLeftIcon,
     ChevronRightIcon,
@@ -10,23 +10,47 @@ import {
 } from "@heroicons/react/24/outline";
 import { clsx } from "clsx";
 import ColumnMenuDropdown from "./column-menu-dropdown";
+import { AnimatePresence, motion } from "framer-motion";
 
 const MIN_WIDTH = 60;
 
-const Aodatagrid = ({ columnDefs, data, pagination = false, className = "" }) => {
+const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className = "" }) => {
     const tableRef = useRef(null);
     const menuButtonRefs = useRef([]);
-
     const [openColumnIndex, setOpenColumnIndex] = useState(null);
-
-    // column widths
     const [columnWidths, setColumnWidths] = useState(columnDefs.map(() => 160));
-
-    // pin state: null | "left" | "right"
     const [pinnedColumns, setPinnedColumns] = useState(columnDefs.map(() => null));
+    const [sortConfig, setSortConfig] = useState({ column: null, direction: null });
+    const [sortedData, setSortedData] = useState([...rawData]);
 
     /** ===========================
-     * Column Resize Handlers
+     * Apply sorting
+     ============================ */
+    useEffect(() => {
+        if (!sortConfig.column) {
+            setSortedData([...rawData]);
+            return;
+        }
+
+        const sorted = [...rawData].sort((a, b) => {
+            const col = columnDefs[sortConfig.column];
+            const aVal = a[col.field];
+            const bVal = b[col.field];
+
+            if (aVal == null) return 1;
+            if (bVal == null) return -1;
+            if (typeof aVal === "number" && typeof bVal === "number") {
+                return sortConfig.direction === "asc" ? aVal - bVal : bVal - aVal;
+            }
+            return sortConfig.direction === "asc"
+                ? String(aVal).localeCompare(String(bVal))
+                : String(bVal).localeCompare(String(aVal));
+        });
+        setSortedData(sorted);
+    }, [sortConfig, rawData, columnDefs]);
+
+    /** ===========================
+     * Column resize
      ============================ */
     const startResize = (index, e) => {
         e.preventDefault();
@@ -42,12 +66,10 @@ const Aodatagrid = ({ columnDefs, data, pagination = false, className = "" }) =>
                 return next;
             });
         };
-
         const onMouseUp = () => {
             document.removeEventListener("mousemove", onMouseMove);
             document.removeEventListener("mouseup", onMouseUp);
         };
-
         document.addEventListener("mousemove", onMouseMove);
         document.addEventListener("mouseup", onMouseUp);
     };
@@ -67,18 +89,18 @@ const Aodatagrid = ({ columnDefs, data, pagination = false, className = "" }) =>
     };
 
     /** ===========================
-     * Pin Column
+     * Pin column
      ============================ */
     const pinColumn = (index, side) => {
         setPinnedColumns((prev) => {
             const next = [...prev];
-            next[index] = side; // null | "left" | "right"
+            next[index] = side;
             return next;
         });
     };
 
     /** ===========================
-     * Sticky Offsets
+     * Sticky offsets
      ============================ */
     const leftOffsets = useMemo(() => {
         let offset = 0;
@@ -105,31 +127,30 @@ const Aodatagrid = ({ columnDefs, data, pagination = false, className = "" }) =>
     }, [columnWidths, pinnedColumns]);
 
     const getCellStyle = (index) => {
-        if (pinnedColumns[index] === "left") {
+        if (pinnedColumns[index] === "left")
             return { position: "sticky", left: leftOffsets[index], zIndex: 20, background: "white" };
-        }
-        if (pinnedColumns[index] === "right") {
+        if (pinnedColumns[index] === "right")
             return { position: "sticky", right: rightOffsets[index], zIndex: 20, background: "white" };
-        }
         return {};
     };
 
     /** ===========================
-     * Column Menu Items (with checked state)
+     * Column menu items
      ============================ */
     const getColumnMenuItems = (index) => {
-        const pinState = pinnedColumns[index]; // null | "left" | "right"
+        const pinState = pinnedColumns[index];
         return [
             { label: "No Pin", action: "noPin", checked: pinState === null },
             { label: "Pin Left", action: "pinLeft", checked: pinState === "left" },
             { label: "Pin Right", action: "pinRight", checked: pinState === "right" },
-            { label: "Reset Pin", action: "reset", checked: pinState === null },
             { label: "Auto Size", action: "autoSize" },
+            { label: "Sort Asc", action: "sortAsc" },
+            { label: "Sort Desc", action: "sortDesc" },
         ];
     };
 
     /** ===========================
-     * Compute Render Order for Left/Center/Right Pinned Columns
+     * Column render order (pinned)
      ============================ */
     const renderOrder = useMemo(() => {
         const leftCols = [];
@@ -143,13 +164,24 @@ const Aodatagrid = ({ columnDefs, data, pagination = false, className = "" }) =>
         return [...leftCols, ...centerCols, ...rightCols];
     }, [columnDefs, pinnedColumns]);
 
+    /** ===========================
+     * Handle menu action
+     ============================ */
+    const handleMenuAction = (action) => {
+        if (action === "autoSize") autoSizeColumn(openColumnIndex);
+        if (action === "noPin") pinColumn(openColumnIndex, null);
+        if (action === "pinLeft") pinColumn(openColumnIndex, "left");
+        if (action === "pinRight") pinColumn(openColumnIndex, "right");
+        if (action === "sortAsc") setSortConfig({ column: openColumnIndex, direction: "asc" });
+        if (action === "sortDesc") setSortConfig({ column: openColumnIndex, direction: "desc" });
+    };
+
     return (
         <div className={clsx("w-10/12", className)}>
             <div className="overflow-x-auto">
                 <table ref={tableRef} className="min-w-full table-fixed border border-gray-200 rounded-lg">
                     {/* HEADER */}
                     <thead className="sticky top-0 z-30 bg-white border-b border-gray-200">
-                        {/* Header Labels */}
                         <tr>
                             {renderOrder.map(({ col, index }) => (
                                 <th
@@ -169,8 +201,6 @@ const Aodatagrid = ({ columnDefs, data, pagination = false, className = "" }) =>
                                             className="w-4 cursor-pointer"
                                         />
                                     </div>
-
-                                    {/* Resize Handle */}
                                     <div
                                         onMouseDown={(e) => startResize(index, e)}
                                         onDoubleClick={() => autoSizeColumn(index)}
@@ -190,38 +220,42 @@ const Aodatagrid = ({ columnDefs, data, pagination = false, className = "" }) =>
                                     className="px-3 py-2"
                                 >
                                     {col.typeFilter === "text" && (
-                                        <input
-                                            type="text"
-                                            className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
-                                        />
+                                        <input type="text" className="w-full rounded border border-gray-300 px-2 py-1 text-sm" />
                                     )}
                                     {col.typeFilter === "date" && (
-                                        <input
-                                            type="date"
-                                            className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
-                                        />
+                                        <input type="date" className="w-full rounded border border-gray-300 px-2 py-1 text-sm" />
                                     )}
                                 </th>
                             ))}
                         </tr>
                     </thead>
 
-                    {/* BODY */}
+                    {/* BODY with smooth slide animation */}
                     <tbody className="divide-y divide-gray-200">
-                        {data?.map((row, r) => (
-                            <tr key={r} className="hover:bg-gray-100">
-                                {renderOrder.map(({ col, index }) => (
-                                    <td
-                                        key={index}
-                                        data-col={index}
-                                        style={{ width: columnWidths[index], ...getCellStyle(index) }}
-                                        className="px-4 py-2 text-sm truncate"
-                                    >
-                                        {row[col.field]}
-                                    </td>
-                                ))}
-                            </tr>
-                        ))}
+                        <AnimatePresence initial={false}>
+                            {sortedData.map((row, r) => (
+                                <motion.tr
+                                    key={row.id || r}
+                                    layout
+                                    initial={{ opacity: 0, y: -20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: 20 }}
+                                    transition={{ duration: 0.3 }}
+                                    className="hover:bg-gray-100"
+                                >
+                                    {renderOrder.map(({ col, index }) => (
+                                        <td
+                                            key={index}
+                                            data-col={index}
+                                            style={{ width: columnWidths[index], ...getCellStyle(index) }}
+                                            className="px-4 py-2 text-sm truncate"
+                                        >
+                                            {row[col.field]}
+                                        </td>
+                                    ))}
+                                </motion.tr>
+                            ))}
+                        </AnimatePresence>
                     </tbody>
                 </table>
             </div>
@@ -240,27 +274,8 @@ const Aodatagrid = ({ columnDefs, data, pagination = false, className = "" }) =>
                                 ? "pinRight"
                                 : "noPin"
                     }
-                    onAction={(action) => {
-                        if (action === "autoSize") autoSizeColumn(openColumnIndex);
-                        if (action === "noPin" || action === "reset") pinColumn(openColumnIndex, null);
-                        if (action === "pinLeft") pinColumn(openColumnIndex, "left");
-                        if (action === "pinRight") pinColumn(openColumnIndex, "right");
-                    }}
+                    onAction={handleMenuAction}
                 />
-            )}
-
-            {/* PAGINATION */}
-            {pagination && (
-                <div className="flex items-center justify-between mt-4 text-sm text-gray-600">
-                    <span>Showing 1 to 10</span>
-                    <div className="flex items-center gap-2">
-                        <ChevronDoubleLeftIcon className="w-4 cursor-pointer" />
-                        <ChevronLeftIcon className="w-4 cursor-pointer" />
-                        <span>Page 1</span>
-                        <ChevronRightIcon className="w-4 cursor-pointer" />
-                        <ChevronDoubleRightIcon className="w-4 cursor-pointer" />
-                    </div>
-                </div>
             )}
         </div>
     );
