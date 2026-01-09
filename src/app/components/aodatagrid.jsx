@@ -24,18 +24,25 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
 
     // <-- STATEFUL DATA FOR CHECKBOXES/RADIOS -->
     const [tableData, setTableData] = useState([...rawData]);
-    const [sortedData, setSortedData] = useState([...rawData]);
+    const [filters, setFilters] = useState({}); // key: column.field, value: filter value
 
     /** ===========================
-     * Apply sorting
+     * Apply filters + sorting
      ============================ */
-    useEffect(() => {
-        if (!sortConfig.column) {
-            setSortedData([...tableData]);
-            return;
-        }
+    const filteredData = useMemo(() => {
+        return tableData.filter(row => {
+            return Object.entries(filters).every(([field, value]) => {
+                if (value == null || value === "") return true;
+                const cellValue = row[field];
+                if (!cellValue) return false;
+                return String(cellValue).toLowerCase().includes(String(value).toLowerCase());
+            });
+        });
+    }, [tableData, filters]);
 
-        const sorted = [...tableData].sort((a, b) => {
+    const sortedData = useMemo(() => {
+        if (!sortConfig.column) return filteredData;
+        const sorted = [...filteredData].sort((a, b) => {
             const col = columnDefs[sortConfig.column];
             const aVal = a[col.field];
             const bVal = b[col.field];
@@ -50,9 +57,8 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
                 ? String(aVal).localeCompare(String(bVal))
                 : String(bVal).localeCompare(String(aVal));
         });
-
-        setSortedData(sorted);
-    }, [sortConfig, tableData, columnDefs]);
+        return sorted;
+    }, [filteredData, sortConfig, columnDefs]);
 
     /** ===========================
      * Column resize
@@ -182,7 +188,7 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
     };
 
     /** ===========================
-     * Render JSX
+     * JSX
      ============================ */
     return (
         <div className={clsx("w-10/12", className)}>
@@ -208,29 +214,22 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
                                                     if (action.selectAll) {
                                                         const allChecked = tableData.every(row => !!row[action.field]);
                                                         const someChecked = tableData.some(row => !!row[action.field]);
-
                                                         return (
                                                             <input
                                                                 key={actionIndex}
                                                                 type="checkbox"
                                                                 className={clsx("w-4 h-4", action.className)}
-                                                                ref={el => {
-                                                                    if (el) el.indeterminate = !allChecked && someChecked;
-                                                                }}
+                                                                ref={el => { if (el) el.indeterminate = !allChecked && someChecked }}
                                                                 checked={allChecked}
                                                                 onChange={() => {
                                                                     const newChecked = !allChecked;
-                                                                    const newData = tableData.map(row => ({
-                                                                        ...row,
-                                                                        [action.field]: newChecked
-                                                                    }));
+                                                                    const newData = tableData.map(row => ({ ...row, [action.field]: newChecked }));
                                                                     setTableData(newData);
                                                                     action.onChange?.(newChecked, newData);
                                                                 }}
                                                             />
                                                         );
-                                                    }
-                                                    else {
+                                                    } else {
                                                         return (
                                                             <input
                                                                 key={actionIndex}
@@ -291,7 +290,7 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
                             ))}
                         </tr>
 
-                        {/* Filter Row */}
+                        {/* FILTER ROW */}
                         <tr>
                             {renderOrder.map(({ col, index }) => (
                                 <th
@@ -301,10 +300,20 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
                                     className="px-3 py-2"
                                 >
                                     {col.typeFilter === "text" && (
-                                        <input type="text" className="w-full rounded border border-gray-300 px-2 py-1 text-sm" />
+                                        <input
+                                            type="text"
+                                            className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                                            value={filters[col.field] || ""}
+                                            onChange={(e) => setFilters({ ...filters, [col.field]: e.target.value })}
+                                        />
                                     )}
                                     {col.typeFilter === "date" && (
-                                        <input type="date" className="w-full rounded border border-gray-300 px-2 py-1 text-sm" />
+                                        <input
+                                            type="date"
+                                            className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                                            value={filters[col.field] || ""}
+                                            onChange={(e) => setFilters({ ...filters, [col.field]: e.target.value })}
+                                        />
                                     )}
                                 </th>
                             ))}
@@ -353,9 +362,7 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
                                                         checked={!!row[action.field]}
                                                         onChange={() => {
                                                             const newData = [...tableData];
-                                                            newData.forEach((r, i) => {
-                                                                if (action.name) r[action.field] = i === rowIndex;
-                                                            });
+                                                            newData.forEach((r, i) => { if (action.name) r[action.field] = i === rowIndex });
                                                             newData[rowIndex] = { ...row, [action.field]: true };
                                                             setTableData(newData);
                                                             action.onChange?.(true, row, rowIndex);
