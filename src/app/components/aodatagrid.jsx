@@ -10,7 +10,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { clsx } from "clsx";
 import ColumnMenuDropdown from "./column-menu-dropdown";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 
 const MIN_WIDTH = 60;
 
@@ -39,6 +39,7 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
 
             if (aVal == null) return 1;
             if (bVal == null) return -1;
+
             if (typeof aVal === "number" && typeof bVal === "number") {
                 return sortConfig.direction === "asc" ? aVal - bVal : bVal - aVal;
             }
@@ -46,6 +47,7 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
                 ? String(aVal).localeCompare(String(bVal))
                 : String(bVal).localeCompare(String(aVal));
         });
+
         setSortedData(sorted);
     }, [sortConfig, rawData, columnDefs]);
 
@@ -230,32 +232,27 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
                         </tr>
                     </thead>
 
-                    {/* BODY with smooth slide animation */}
+                    {/* BODY with smooth slide animation on sort */}
                     <tbody className="divide-y divide-gray-200">
-                        <AnimatePresence initial={false}>
-                            {sortedData.map((row, r) => (
-                                <motion.tr
-                                    key={row.id || r}
-                                    layout
-                                    initial={{ opacity: 0, y: -20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: 20 }}
-                                    transition={{ duration: 0.3 }}
-                                    className="hover:bg-gray-100"
-                                >
-                                    {renderOrder.map(({ col, index }) => (
-                                        <td
-                                            key={index}
-                                            data-col={index}
-                                            style={{ width: columnWidths[index], ...getCellStyle(index) }}
-                                            className="px-4 py-2 text-sm truncate"
-                                        >
-                                            {row[col.field]}
-                                        </td>
-                                    ))}
-                                </motion.tr>
-                            ))}
-                        </AnimatePresence>
+                        {sortedData.map((row) => (
+                            <motion.tr
+                                key={row.id || row.key || JSON.stringify(row)} // stable key
+                                layout // enables smooth slide
+                                transition={{ duration: 0.3 }}
+                                className="hover:bg-gray-100"
+                            >
+                                {renderOrder.map(({ col, index }) => (
+                                    <td
+                                        key={index}
+                                        data-col={index}
+                                        style={{ width: columnWidths[index], ...getCellStyle(index) }}
+                                        className="px-4 py-2 text-sm truncate"
+                                    >
+                                        {row[col.field]}
+                                    </td>
+                                ))}
+                            </motion.tr>
+                        ))}
                     </tbody>
                 </table>
             </div>
@@ -276,6 +273,20 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
                     }
                     onAction={handleMenuAction}
                 />
+            )}
+
+            {/* PAGINATION */}
+            {pagination && (
+                <div className="flex items-center justify-between mt-4 text-sm text-gray-600">
+                    <span>Showing 1 to 10</span>
+                    <div className="flex items-center gap-2">
+                        <ChevronDoubleLeftIcon className="w-4 cursor-pointer" />
+                        <ChevronLeftIcon className="w-4 cursor-pointer" />
+                        <span>Page 1</span>
+                        <ChevronRightIcon className="w-4 cursor-pointer" />
+                        <ChevronDoubleRightIcon className="w-4 cursor-pointer" />
+                    </div>
+                </div>
             )}
         </div>
     );
