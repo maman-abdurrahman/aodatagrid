@@ -194,15 +194,60 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
                                 >
                                     <div className="flex items-center justify-between">
                                         <span className="truncate">{col.label}</span>
-                                        <EllipsisVerticalIcon
-                                            ref={(el) => (menuButtonRefs.current[index] = el)}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setOpenColumnIndex(openColumnIndex === index ? null : index);
-                                            }}
-                                            className="w-4 cursor-pointer"
-                                        />
+
+                                        {/* Header Actions */}
+                                        <div className="flex items-center gap-1">
+                                            {col.actions?.map((action, actionIndex) => {
+                                                if (action.type === "checkbox")
+                                                    return (
+                                                        <input
+                                                            key={actionIndex}
+                                                            type="checkbox"
+                                                            className={clsx("w-4 h-4", action.className)}
+                                                            onChange={(e) => action.onChange?.(e.target.checked)}
+                                                        />
+                                                    );
+
+                                                if (action.type === "radio")
+                                                    return (
+                                                        <input
+                                                            key={actionIndex}
+                                                            type="radio"
+                                                            className={clsx("w-4 h-4", action.className)}
+                                                            name={action.name || `radio-${index}`}
+                                                            onChange={() => action.onChange?.(true)}
+                                                        />
+                                                    );
+
+                                                if (action.type === "button")
+                                                    return (
+                                                        <button
+                                                            key={actionIndex}
+                                                            className={clsx(
+                                                                "px-2 py-1 rounded text-white bg-blue-500 hover:bg-blue-600",
+                                                                action.className
+                                                            )}
+                                                            onClick={() => action.onClick?.()}
+                                                        >
+                                                            {action.label || "Action"}
+                                                        </button>
+                                                    );
+
+                                                return null;
+                                            })}
+
+                                            <EllipsisVerticalIcon
+                                                ref={(el) => (menuButtonRefs.current[index] = el)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setOpenColumnIndex(openColumnIndex === index ? null : index);
+                                                }}
+                                                className="w-4 cursor-pointer"
+                                            />
+                                        </div>
                                     </div>
+
+                                    {/* Column Resize */}
                                     <div
                                         onMouseDown={(e) => startResize(index, e)}
                                         onDoubleClick={() => autoSizeColumn(index)}
@@ -234,10 +279,10 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
 
                     {/* BODY with smooth slide animation on sort */}
                     <tbody className="divide-y divide-gray-200">
-                        {sortedData.map((row) => (
+                        {sortedData.map((row, rowIndex) => (
                             <motion.tr
-                                key={row.id || row.key || JSON.stringify(row)} // stable key
-                                layout // enables smooth slide
+                                key={row.id || row.key || JSON.stringify(row)}
+                                layout
                                 transition={{ duration: 0.3 }}
                                 className="hover:bg-gray-100"
                             >
@@ -248,7 +293,50 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
                                         style={{ width: columnWidths[index], ...getCellStyle(index) }}
                                         className="px-4 py-2 text-sm truncate"
                                     >
-                                        {row[col.field]}
+                                        {/* Body Actions */}
+                                        {col.actions?.map((action, actionIndex) => {
+                                            if (action.type === "checkbox")
+                                                return (
+                                                    <input
+                                                        key={actionIndex}
+                                                        type="checkbox"
+                                                        checked={!!row[action.field]}
+                                                        onChange={(e) =>
+                                                            action.onChange?.(e.target.checked, row, rowIndex)
+                                                        }
+                                                    />
+                                                );
+
+                                            if (action.type === "radio")
+                                                return (
+                                                    <input
+                                                        key={actionIndex}
+                                                        type="radio"
+                                                        name={action.name || `radio-${index}`}
+                                                        checked={!!row[action.field]}
+                                                        onChange={() => action.onChange?.(true, row, rowIndex)}
+                                                    />
+                                                );
+
+                                            if (action.type === "button")
+                                                return (
+                                                    <button
+                                                        key={actionIndex}
+                                                        className={clsx(
+                                                            "px-2 py-1 rounded text-white bg-blue-500 hover:bg-blue-600",
+                                                            action.className
+                                                        )}
+                                                        onClick={() => action.onClick?.(row, rowIndex)}
+                                                    >
+                                                        {action.label || "Action"}
+                                                    </button>
+                                                );
+
+                                            return null;
+                                        })}
+
+                                        {/* Default cell value */}
+                                        {["text", "date", undefined].includes(col.type) && row[col.field]}
                                     </td>
                                 ))}
                             </motion.tr>

@@ -42,10 +42,7 @@ export default function Home() {
 			field:"actions", 
 			label: "Actions", 
 			typeFilter: "text",
-			onClick: () => console.info("Header"), 
-			actions: [
-				{name: "edit", label: "Delete", type: "button", className:"bg-red-600", onClick: () => console.info("Baka")}
-			]
+			onClick: () => console.info("Header")
 		}
 	])
 	return (
