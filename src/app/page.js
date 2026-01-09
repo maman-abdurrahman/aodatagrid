@@ -11,7 +11,7 @@ export default function Home() {
 			label: "ID",
 			onClick: () => console.info("Header"), 
 			actions: [
-				{name: "checkbox", label: "", type: "checkbox", className:"bg-red-600", onChange: () => console.info("Baka")}
+				{name: "checkbox", label: "", selectAll:true, type: "checkbox", className:"bg-red-600", onChange: () => console.info("Baka")}
 			]
 		},
 		{

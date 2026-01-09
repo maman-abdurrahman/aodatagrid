@@ -204,15 +204,43 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
                                         {/* Header Actions */}
                                         <div className="flex items-center gap-1">
                                             {col.actions?.map((action, actionIndex) => {
-                                                if (action.type === "checkbox")
-                                                    return (
-                                                        <input
-                                                            key={actionIndex}
-                                                            type="checkbox"
-                                                            className={clsx("w-4 h-4", action.className)}
-                                                            onChange={(e) => action.onChange?.(e.target.checked)}
-                                                        />
-                                                    );
+                                                if (action.type === "checkbox") {
+                                                    if (action.selectAll) {
+                                                        const allChecked = tableData.every(row => !!row[action.field]);
+                                                        const someChecked = tableData.some(row => !!row[action.field]);
+
+                                                        return (
+                                                            <input
+                                                                key={actionIndex}
+                                                                type="checkbox"
+                                                                className={clsx("w-4 h-4", action.className)}
+                                                                ref={el => {
+                                                                    if (el) el.indeterminate = !allChecked && someChecked;
+                                                                }}
+                                                                checked={allChecked}
+                                                                onChange={() => {
+                                                                    const newChecked = !allChecked;
+                                                                    const newData = tableData.map(row => ({
+                                                                        ...row,
+                                                                        [action.field]: newChecked
+                                                                    }));
+                                                                    setTableData(newData);
+                                                                    action.onChange?.(newChecked, newData);
+                                                                }}
+                                                            />
+                                                        );
+                                                    }
+                                                    else {
+                                                        return (
+                                                            <input
+                                                                key={actionIndex}
+                                                                type="checkbox"
+                                                                className={clsx("w-4 h-4", action.className)}
+                                                                onChange={(e) => action.onChange?.(e.target.checked)}
+                                                            />
+                                                        );
+                                                    }
+                                                }
 
                                                 if (action.type === "radio")
                                                     return (
