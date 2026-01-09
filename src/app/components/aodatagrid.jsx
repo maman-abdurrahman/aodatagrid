@@ -21,6 +21,9 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
     const [columnWidths, setColumnWidths] = useState(columnDefs.map(() => 160));
     const [pinnedColumns, setPinnedColumns] = useState(columnDefs.map(() => null));
     const [sortConfig, setSortConfig] = useState({ column: null, direction: null });
+
+    // <-- STATEFUL DATA FOR CHECKBOXES/RADIOS -->
+    const [tableData, setTableData] = useState([...rawData]);
     const [sortedData, setSortedData] = useState([...rawData]);
 
     /** ===========================
@@ -28,11 +31,11 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
      ============================ */
     useEffect(() => {
         if (!sortConfig.column) {
-            setSortedData([...rawData]);
+            setSortedData([...tableData]);
             return;
         }
 
-        const sorted = [...rawData].sort((a, b) => {
+        const sorted = [...tableData].sort((a, b) => {
             const col = columnDefs[sortConfig.column];
             const aVal = a[col.field];
             const bVal = b[col.field];
@@ -49,7 +52,7 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
         });
 
         setSortedData(sorted);
-    }, [sortConfig, rawData, columnDefs]);
+    }, [sortConfig, tableData, columnDefs]);
 
     /** ===========================
      * Column resize
@@ -178,6 +181,9 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
         if (action === "sortDesc") setSortConfig({ column: openColumnIndex, direction: "desc" });
     };
 
+    /** ===========================
+     * Render JSX
+     ============================ */
     return (
         <div className={clsx("w-10/12", className)}>
             <div className="overflow-x-auto">
@@ -277,7 +283,7 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
                         </tr>
                     </thead>
 
-                    {/* BODY with smooth slide animation on sort */}
+                    {/* BODY */}
                     <tbody className="divide-y divide-gray-200">
                         {sortedData.map((row, rowIndex) => (
                             <motion.tr
@@ -293,7 +299,7 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
                                         style={{ width: columnWidths[index], ...getCellStyle(index) }}
                                         className="px-4 py-2 text-sm truncate"
                                     >
-                                        {/* Body Actions */}
+                                        {/* Row Actions */}
                                         {col.actions?.map((action, actionIndex) => {
                                             if (action.type === "checkbox")
                                                 return (
@@ -301,9 +307,12 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
                                                         key={actionIndex}
                                                         type="checkbox"
                                                         checked={!!row[action.field]}
-                                                        onChange={(e) =>
-                                                            action.onChange?.(e.target.checked, row, rowIndex)
-                                                        }
+                                                        onChange={(e) => {
+                                                            const newData = [...tableData];
+                                                            newData[rowIndex] = { ...row, [action.field]: e.target.checked };
+                                                            setTableData(newData);
+                                                            action.onChange?.(e.target.checked, row, rowIndex);
+                                                        }}
                                                     />
                                                 );
 
@@ -314,7 +323,15 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
                                                         type="radio"
                                                         name={action.name || `radio-${index}`}
                                                         checked={!!row[action.field]}
-                                                        onChange={() => action.onChange?.(true, row, rowIndex)}
+                                                        onChange={() => {
+                                                            const newData = [...tableData];
+                                                            newData.forEach((r, i) => {
+                                                                if (action.name) r[action.field] = i === rowIndex;
+                                                            });
+                                                            newData[rowIndex] = { ...row, [action.field]: true };
+                                                            setTableData(newData);
+                                                            action.onChange?.(true, row, rowIndex);
+                                                        }}
                                                     />
                                                 );
 
