@@ -14,32 +14,44 @@ import { motion } from "framer-motion";
 
 const MIN_WIDTH = 60;
 
-const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className = "" }) => {
+const Aodatagrid = ({
+    columnDefs,
+    data: rawData,
+    pagination = false,
+    pageSizeOptions = [5, 10, 20],
+    className = "",
+}) => {
     const tableRef = useRef(null);
     const menuButtonRefs = useRef([]);
     const [openColumnIndex, setOpenColumnIndex] = useState(null);
     const [columnWidths, setColumnWidths] = useState(columnDefs.map(() => 160));
     const [pinnedColumns, setPinnedColumns] = useState(columnDefs.map(() => null));
     const [sortConfig, setSortConfig] = useState({ column: null, direction: null });
+    const [filters, setFilters] = useState({});
+    const [selectedRows, setSelectedRows] = useState({});
+    const [selectAll, setSelectAll] = useState(false);
 
-    // <-- STATEFUL DATA FOR CHECKBOXES/RADIOS -->
-    const [tableData, setTableData] = useState([...rawData]);
-    const [filters, setFilters] = useState({}); // key: column.field, value: filter value
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(pageSizeOptions[0]);
 
     /** ===========================
-     * Apply filters + sorting
+     * Filtering
      ============================ */
     const filteredData = useMemo(() => {
-        return tableData.filter(row => {
+        return rawData.filter((row) => {
             return Object.entries(filters).every(([field, value]) => {
-                if (value == null || value === "") return true;
+                if (!value) return true;
                 const cellValue = row[field];
                 if (!cellValue) return false;
                 return String(cellValue).toLowerCase().includes(String(value).toLowerCase());
             });
         });
-    }, [tableData, filters]);
+    }, [rawData, filters]);
 
+    /** ===========================
+     * Sorting
+     ============================ */
     const sortedData = useMemo(() => {
         if (!sortConfig.column) return filteredData;
         const sorted = [...filteredData].sort((a, b) => {
@@ -59,6 +71,15 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
         });
         return sorted;
     }, [filteredData, sortConfig, columnDefs]);
+
+    /** ===========================
+     * Pagination
+     ============================ */
+    const totalPages = Math.max(1, Math.ceil(sortedData.length / pageSize));
+    const paginatedData = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return sortedData.slice(start, start + pageSize);
+    }, [sortedData, currentPage, pageSize]);
 
     /** ===========================
      * Column resize
@@ -160,9 +181,6 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
         ];
     };
 
-    /** ===========================
-     * Column render order (pinned)
-     ============================ */
     const renderOrder = useMemo(() => {
         const leftCols = [];
         const centerCols = [];
@@ -175,9 +193,6 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
         return [...leftCols, ...centerCols, ...rightCols];
     }, [columnDefs, pinnedColumns]);
 
-    /** ===========================
-     * Handle menu action
-     ============================ */
     const handleMenuAction = (action) => {
         if (action === "autoSize") autoSizeColumn(openColumnIndex);
         if (action === "noPin") pinColumn(openColumnIndex, null);
@@ -188,14 +203,51 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
     };
 
     /** ===========================
+     * Checkbox handlers
+     ============================ */
+    const handleSelectAll = (e) => {
+        const checked = e.target.checked;
+        setSelectAll(checked);
+        const newSelected = {};
+        if (checked) {
+            paginatedData.forEach((row) => {
+                newSelected[row.id] = true;
+            });
+        }
+        setSelectedRows((prev) => ({ ...prev, ...newSelected }));
+    };
+
+    const handleRowSelect = (row, e) => {
+        const checked = e.target.checked;
+        setSelectedRows((prev) => {
+            const next = { ...prev };
+            if (checked) next[row.id] = true;
+            else delete next[row.id];
+            return next;
+        });
+    };
+
+    /** ===========================
+     * Pagination handlers
+     ============================ */
+    const goToPage = (page) => {
+        const p = Math.min(Math.max(page, 1), totalPages);
+        setCurrentPage(p);
+    };
+    const nextPage = () => goToPage(currentPage + 1);
+    const prevPage = () => goToPage(currentPage - 1);
+    const firstPage = () => goToPage(1);
+    const lastPage = () => goToPage(totalPages);
+
+    /** ===========================
      * JSX
      ============================ */
     return (
-        <div className={clsx("w-10/12", className)}>
+        <div className={clsx("w-11/12 mx-auto", className)}>
             <div className="overflow-x-auto">
                 <table ref={tableRef} className="min-w-full table-fixed border border-gray-200 rounded-lg">
-                    {/* HEADER */}
                     <thead className="sticky top-0 z-30 bg-white border-b border-gray-200">
+                        {/* HEADER */}
                         <tr>
                             {renderOrder.map(({ col, index }) => (
                                 <th
@@ -206,81 +258,26 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
                                 >
                                     <div className="flex items-center justify-between">
                                         <span className="truncate">{col.label}</span>
-
-                                        {/* Header Actions */}
-                                        <div className="flex items-center gap-1">
-                                            {col.actions?.map((action, actionIndex) => {
-                                                if (action.type === "checkbox") {
-                                                    if (action.selectAll) {
-                                                        const allChecked = tableData.every(row => !!row[action.field]);
-                                                        const someChecked = tableData.some(row => !!row[action.field]);
-                                                        return (
-                                                            <input
-                                                                key={actionIndex}
-                                                                type="checkbox"
-                                                                className={clsx("w-4 h-4", action.className)}
-                                                                ref={el => { if (el) el.indeterminate = !allChecked && someChecked }}
-                                                                checked={allChecked}
-                                                                onChange={() => {
-                                                                    const newChecked = !allChecked;
-                                                                    const newData = tableData.map(row => ({ ...row, [action.field]: newChecked }));
-                                                                    setTableData(newData);
-                                                                    action.onChange?.(newChecked, newData);
-                                                                }}
-                                                            />
-                                                        );
-                                                    } else {
-                                                        return (
-                                                            <input
-                                                                key={actionIndex}
-                                                                type="checkbox"
-                                                                className={clsx("w-4 h-4", action.className)}
-                                                                onChange={(e) => action.onChange?.(e.target.checked)}
-                                                            />
-                                                        );
-                                                    }
-                                                }
-
-                                                if (action.type === "radio")
-                                                    return (
-                                                        <input
-                                                            key={actionIndex}
-                                                            type="radio"
-                                                            className={clsx("w-4 h-4", action.className)}
-                                                            name={action.name || `radio-${index}`}
-                                                            onChange={() => action.onChange?.(true)}
-                                                        />
-                                                    );
-
-                                                if (action.type === "button")
-                                                    return (
-                                                        <button
-                                                            key={actionIndex}
-                                                            className={clsx(
-                                                                "px-2 py-1 rounded text-white bg-blue-500 hover:bg-blue-600",
-                                                                action.className
-                                                            )}
-                                                            onClick={() => action.onClick?.()}
-                                                        >
-                                                            {action.label || "Action"}
-                                                        </button>
-                                                    );
-
-                                                return null;
-                                            })}
-
-                                            <EllipsisVerticalIcon
-                                                ref={(el) => (menuButtonRefs.current[index] = el)}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setOpenColumnIndex(openColumnIndex === index ? null : index);
-                                                }}
-                                                className="w-4 cursor-pointer"
-                                            />
-                                        </div>
+                                        {col.actions?.map((action, i) =>
+                                            action.type === "checkbox" ? (
+                                                <input
+                                                    key={i}
+                                                    type="checkbox"
+                                                    className={clsx("mr-2", action.className)}
+                                                    checked={selectAll}
+                                                    onChange={handleSelectAll}
+                                                />
+                                            ) : null
+                                        )}
+                                        <EllipsisVerticalIcon
+                                            ref={(el) => (menuButtonRefs.current[index] = el)}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setOpenColumnIndex(openColumnIndex === index ? null : index);
+                                            }}
+                                            className="w-4 cursor-pointer"
+                                        />
                                     </div>
-
-                                    {/* Column Resize */}
                                     <div
                                         onMouseDown={(e) => startResize(index, e)}
                                         onDoubleClick={() => autoSizeColumn(index)}
@@ -303,16 +300,18 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
                                         <input
                                             type="text"
                                             className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
-                                            value={filters[col.field] || ""}
-                                            onChange={(e) => setFilters({ ...filters, [col.field]: e.target.value })}
+                                            onChange={(e) =>
+                                                setFilters((prev) => ({ ...prev, [col.field]: e.target.value }))
+                                            }
                                         />
                                     )}
                                     {col.typeFilter === "date" && (
                                         <input
                                             type="date"
                                             className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
-                                            value={filters[col.field] || ""}
-                                            onChange={(e) => setFilters({ ...filters, [col.field]: e.target.value })}
+                                            onChange={(e) =>
+                                                setFilters((prev) => ({ ...prev, [col.field]: e.target.value }))
+                                            }
                                         />
                                     )}
                                 </th>
@@ -322,7 +321,7 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
 
                     {/* BODY */}
                     <tbody className="divide-y divide-gray-200">
-                        {sortedData.map((row, rowIndex) => (
+                        {paginatedData.map((row) => (
                             <motion.tr
                                 key={row.id || row.key || JSON.stringify(row)}
                                 layout
@@ -336,59 +335,18 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
                                         style={{ width: columnWidths[index], ...getCellStyle(index) }}
                                         className="px-4 py-2 text-sm truncate"
                                     >
-                                        {/* Row Actions */}
-                                        {col.actions?.map((action, actionIndex) => {
-                                            if (action.type === "checkbox")
-                                                return (
-                                                    <input
-                                                        key={actionIndex}
-                                                        type="checkbox"
-                                                        checked={!!row[action.field]}
-                                                        onChange={(e) => {
-                                                            const newData = [...tableData];
-                                                            newData[rowIndex] = { ...row, [action.field]: e.target.checked };
-                                                            setTableData(newData);
-                                                            action.onChange?.(e.target.checked, row, rowIndex);
-                                                        }}
-                                                    />
-                                                );
-
-                                            if (action.type === "radio")
-                                                return (
-                                                    <input
-                                                        key={actionIndex}
-                                                        type="radio"
-                                                        name={action.name || `radio-${index}`}
-                                                        checked={!!row[action.field]}
-                                                        onChange={() => {
-                                                            const newData = [...tableData];
-                                                            newData.forEach((r, i) => { if (action.name) r[action.field] = i === rowIndex });
-                                                            newData[rowIndex] = { ...row, [action.field]: true };
-                                                            setTableData(newData);
-                                                            action.onChange?.(true, row, rowIndex);
-                                                        }}
-                                                    />
-                                                );
-
-                                            if (action.type === "button")
-                                                return (
-                                                    <button
-                                                        key={actionIndex}
-                                                        className={clsx(
-                                                            "px-2 py-1 rounded text-white bg-blue-500 hover:bg-blue-600",
-                                                            action.className
-                                                        )}
-                                                        onClick={() => action.onClick?.(row, rowIndex)}
-                                                    >
-                                                        {action.label || "Action"}
-                                                    </button>
-                                                );
-
-                                            return null;
-                                        })}
-
-                                        {/* Default cell value */}
-                                        {["text", "date", undefined].includes(col.type) && row[col.field]}
+                                        {col.actions?.map((action, i) =>
+                                            action.type === "checkbox" ? (
+                                                <input
+                                                    key={i}
+                                                    type="checkbox"
+                                                    className={clsx(action.className)}
+                                                    checked={!!selectedRows[row.id]}
+                                                    onChange={(e) => handleRowSelect(row, e)}
+                                                />
+                                            ) : null
+                                        )}
+                                        {row[col.field]}
                                     </td>
                                 ))}
                             </motion.tr>
@@ -418,13 +376,42 @@ const Aodatagrid = ({ columnDefs, data: rawData, pagination = false, className =
             {/* PAGINATION */}
             {pagination && (
                 <div className="flex items-center justify-between mt-4 text-sm text-gray-600">
-                    <span>Showing 1 to 10</span>
+                    <div>
+                        Showing {(currentPage - 1) * pageSize + 1} to{" "}
+                        {Math.min(currentPage * pageSize, sortedData.length)} of {sortedData.length}
+                    </div>
+
                     <div className="flex items-center gap-2">
-                        <ChevronDoubleLeftIcon className="w-4 cursor-pointer" />
-                        <ChevronLeftIcon className="w-4 cursor-pointer" />
-                        <span>Page 1</span>
-                        <ChevronRightIcon className="w-4 cursor-pointer" />
-                        <ChevronDoubleRightIcon className="w-4 cursor-pointer" />
+                        <button onClick={firstPage} className="px-2 py-1 border rounded">
+                            {"<<"}
+                        </button>
+                        <button onClick={prevPage} className="px-2 py-1 border rounded">
+                            {"<"}
+                        </button>
+                        <span>
+                            Page {currentPage} / {totalPages}
+                        </span>
+                        <button onClick={nextPage} className="px-2 py-1 border rounded">
+                            {">"}
+                        </button>
+                        <button onClick={lastPage} className="px-2 py-1 border rounded">
+                            {">>"}
+                        </button>
+
+                        <select
+                            value={pageSize}
+                            onChange={(e) => {
+                                setPageSize(Number(e.target.value));
+                                setCurrentPage(1);
+                            }}
+                            className="border rounded px-2 py-1 ml-2"
+                        >
+                            {pageSizeOptions.map((size) => (
+                                <option key={size} value={size}>
+                                    {size} / page
+                                </option>
+                            ))}
+                        </select>
                     </div>
                 </div>
             )}
