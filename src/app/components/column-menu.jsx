@@ -31,6 +31,7 @@ export default function ColumnMenu({ onAction, activeKey }) {
                         >
                             {/* Checkmark */}
                             <span className="w-4 mr-2 text-blue-500">
+                                {console.info("CKK >>",activeKey)}
                                 {activeKey === item.key ? "✔" : ""}
                             </span>
                             {item.label}

@@ -233,6 +233,13 @@ const Aodatagrid = ({ columnDefs, data, pagination = false, className = "" }) =>
                     open={true}
                     onClose={() => setOpenColumnIndex(null)}
                     menuItems={getColumnMenuItems(openColumnIndex)}
+                    activeKey={
+                        pinnedColumns[openColumnIndex] === "left"
+                            ? "pinLeft"
+                            : pinnedColumns[openColumnIndex] === "right"
+                                ? "pinRight"
+                                : "noPin"
+                    }
                     onAction={(action) => {
                         if (action === "autoSize") autoSizeColumn(openColumnIndex);
                         if (action === "noPin" || action === "reset") pinColumn(openColumnIndex, null);

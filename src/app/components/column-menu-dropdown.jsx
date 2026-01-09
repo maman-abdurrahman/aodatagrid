@@ -4,12 +4,7 @@ import { useEffect, useRef } from "react";
 import Portal from "./portal";
 import ColumnMenu from "./column-menu";
 
-export default function ColumnMenuDropdown({
-    anchorRef,
-    open,
-    onClose,
-    onAction,
-}) {
+export default function ColumnMenuDropdown({ anchorRef, open, onClose, onAction, activeKey }) {
     const menuRef = useRef(null);
 
     useEffect(() => {
@@ -24,8 +19,7 @@ export default function ColumnMenuDropdown({
         }
 
         if (open) document.addEventListener("mousedown", handleClickOutside);
-        return () =>
-            document.removeEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [open, onClose, anchorRef]);
 
     if (!open || !anchorRef.current) return null;
@@ -48,6 +42,7 @@ export default function ColumnMenuDropdown({
                         onAction(action);
                         onClose();
                     }}
+                    activeKey={activeKey}
                 />
             </div>
         </Portal>
