@@ -241,6 +241,14 @@ const Aodatagrid = ({
 		return col?.actions?.onChange && col?.actions?.onChange(obj)
 	};
 
+	const handlerClick = (col, row) => {
+		const obj = {
+			column: col,
+			values: [row]
+		}
+		return col?.actions?.onClick && col?.actions?.onClick(obj)
+	}
+
 	// Update header checkbox indeterminate state
 	useEffect(() => {
 		if (!headerCheckboxRef.current) return;
@@ -358,15 +366,29 @@ const Aodatagrid = ({
 										className="px-4 py-2 text-sm truncate"
 									>
 										{col.actions?.map((action, i) =>
-											action.type === "checkbox" ? (
-												<input
-													key={i}
-													type="checkbox"
-													className={clsx(action.className)}
-													checked={!!selectedRows[row.id]}
-													onChange={(e) => handleRowSelect({...col, actions: action}, row, e)}
-												/>
-											) : null
+											<div key={i}>
+												{
+													action.type === "checkbox" ? (
+														<input
+															type="checkbox"
+															className={clsx(action.className)}
+															checked={!!selectedRows[row.id]}
+															onChange={(e) => handleRowSelect({...col, actions: action}, row, e)}
+														/>
+													) : null
+												}
+												{
+													action.type === "button" ? (
+														<button
+															type="button"
+															className={clsx(action.className, "bg-gray-400 rounded-[8px] text-white cursor-pointer border border-brand hover:bg-brand hover:text-white focus:ring-4 focus:ring-brand-subtle font-medium leading-5 rounded-base text-xs px-3 py-1.5 focus:outline-none")}
+															onClick={(e) => handlerClick({...col, actions: action}, row)}
+														>
+														{action.label || ""}
+														</button>
+													) : null
+												}
+											</div>
 										)}
 										{row[col.field]}
 									</td>

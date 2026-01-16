@@ -43,7 +43,10 @@ export default function Home() {
 			field:"actions", 
 			label: "Actions", 
 			typeFilter: "text",
-			onClick: () => console.info("Header")
+			onClick: () => console.info("Header"),
+			actions: [
+				{name: "edit", label: "edit", type: "button", className:"", onClick: (item) => console.info("AHOO >> ", {item})}
+			]
 		}
 	])
 	return (
