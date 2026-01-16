@@ -223,7 +223,7 @@ const Aodatagrid = ({
 		return col?.onChange && col?.onChange(obj) 
 	};
 
-	const handleRowSelect = (row, e) => {
+	const handleRowSelect = (col, row, e) => {
 		const checked = e.target.checked;
 		const newSelectRow = {...selectedRows}
 		if(!checked){
@@ -233,6 +233,12 @@ const Aodatagrid = ({
 			newSelectRow[row.id] = row
 		}
 		setSelectedRows(newSelectRow)
+		const selectedAll = Object.values(newSelectRow)
+		const obj = {
+			column: col,
+			values: selectedAll
+		}
+		return col?.actions?.onChange && col?.actions?.onChange(obj)
 	};
 
 	// Update header checkbox indeterminate state
@@ -275,13 +281,13 @@ const Aodatagrid = ({
 									<div className="flex items-center justify-between">
 										<span className="truncate">{col.label}</span>
 										{col.actions?.map((action, i) =>
-											action.type === "checkbox" ? (
+											action.type === "checkbox" && action.selectedAll === true ? (
 												<input
 													key={i}
 													type="checkbox"
 													ref={headerCheckboxRef}
 													className={clsx("mr-2", action.className)}
-													onChange={e => handleSelectAll(e, action, i)}
+													onChange={e => handleSelectAll(e, {...col, actions: action}, i)}
 												/>
 											) : null
 										)}
@@ -358,7 +364,7 @@ const Aodatagrid = ({
 													type="checkbox"
 													className={clsx(action.className)}
 													checked={!!selectedRows[row.id]}
-													onChange={(e) => handleRowSelect(row, e)}
+													onChange={(e) => handleRowSelect({...col, actions: action}, row, e)}
 												/>
 											) : null
 										)}
