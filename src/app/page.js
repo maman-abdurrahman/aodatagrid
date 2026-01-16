@@ -9,9 +9,10 @@ export default function Home() {
 		{
 			field:"id", 
 			label: "ID",
-			onClick: () => console.info("Header"), 
+			sortable: true,
+			onClick: () => console.info("Header"),
 			actions: [
-				{name: "checkbox", label: "", selectAll:true, type: "checkbox", className:"bg-red-600", onChange: () => console.info("Baka")}
+				{name: "checkbox", label: "", selectAll:true, type: "checkbox", className:"bg-red-600", onChange: (item) => console.info("AHOO >> ", {item})}
 			]
 		},
 		{
